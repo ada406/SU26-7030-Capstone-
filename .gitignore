@@ -1,0 +1,29 @@
+# Conda / Python
+.conda/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Secrets
+.kaggle/
+**/kaggle.json
+.env
+
+# Data (download locally; do not commit the CSV)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Model artifacts / figures (generated later)
+models/*
+!models/.gitkeep
+outputs/*
+!outputs/.gitkeep
+*.joblib
+*.pkl
+
+# Local transfer archives (do not commit)
+*.zip

@@ -1,0 +1,17 @@
+name: spotify-genre-prediction
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pandas
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - jupyter
+  - ipykernel
+  - joblib
+  - pip:
+      - kaggle
