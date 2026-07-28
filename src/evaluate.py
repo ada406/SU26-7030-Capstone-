@@ -161,3 +161,25 @@ def predict_genres(features: pd.DataFrame) -> pd.DataFrame:
         ", ".join(classes[idx_row]) for idx_row in top3_idx
     ]
     return out
+
+
+def predict_topk_table(features: pd.DataFrame, k: int = 5) -> pd.DataFrame:
+    """
+    Return a tidy table of top-k genre probabilities for the first row of features.
+
+    Columns: genre, probability
+    """
+    missing = [c for c in AUDIO_FEATURES if c not in features.columns]
+    if missing:
+        raise ValueError(f"Missing audio feature columns: {missing}")
+
+    model = load_trained_model()
+    proba = model.predict_proba(features[AUDIO_FEATURES])[0]
+    classes = np.asarray(model.classes_)
+    order = np.argsort(proba)[::-1][:k]
+    return pd.DataFrame(
+        {
+            "genre": classes[order],
+            "probability": proba[order],
+        }
+    )
