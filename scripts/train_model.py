@@ -38,8 +38,20 @@ def main() -> None:
     parser.add_argument(
         "--n-estimators",
         type=int,
-        default=200,
-        help="Number of trees in the Random Forest (default: 200).",
+        default=100,
+        help="Number of trees in the Random Forest (default: 100).",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=18,
+        help="Max tree depth (default: 18). Keeps the saved model smaller.",
+    )
+    parser.add_argument(
+        "--min-samples-leaf",
+        type=int,
+        default=5,
+        help="Minimum samples per leaf (default: 5).",
     )
     parser.add_argument(
         "--test-size",
@@ -70,6 +82,8 @@ def main() -> None:
 
     result = train_genre_classifier(
         n_estimators=args.n_estimators,
+        max_depth=args.max_depth,
+        min_samples_leaf=args.min_samples_leaf,
         test_size=args.test_size,
         min_genre_count=args.min_genre_count,
         collapse_genres=not args.no_collapse,

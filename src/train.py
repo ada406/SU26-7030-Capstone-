@@ -48,8 +48,17 @@ def prepare_xy(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     return X, y
 
 
-def build_pipeline(n_estimators: int = 200) -> Pipeline:
-    """Standardize features, then classify with a Random Forest."""
+def build_pipeline(
+    n_estimators: int = 100,
+    max_depth: int = 18,
+    min_samples_leaf: int = 5,
+) -> Pipeline:
+    """
+    Standardize features, then classify with a depth-limited Random Forest.
+
+    Depth / leaf limits keep the saved .joblib small enough for GitHub (<100MB)
+    while remaining strong enough for the collapsed-genre task.
+    """
     return Pipeline(
         steps=[
             ("scaler", StandardScaler()),
@@ -57,6 +66,8 @@ def build_pipeline(n_estimators: int = 200) -> Pipeline:
                 "clf",
                 RandomForestClassifier(
                     n_estimators=n_estimators,
+                    max_depth=max_depth,
+                    min_samples_leaf=min_samples_leaf,
                     random_state=RANDOM_STATE,
                     n_jobs=-1,
                     class_weight="balanced_subsample",
@@ -68,7 +79,9 @@ def build_pipeline(n_estimators: int = 200) -> Pipeline:
 
 def train_genre_classifier(
     df: pd.DataFrame | None = None,
-    n_estimators: int = 200,
+    n_estimators: int = 100,
+    max_depth: int = 18,
+    min_samples_leaf: int = 5,
     test_size: float = TEST_SIZE,
     random_state: int = RANDOM_STATE,
     min_genre_count: int = DEFAULT_MIN_GENRE_COUNT,
@@ -109,8 +122,16 @@ def train_genre_classifier(
         stratify=y,
     )
 
-    pipeline = build_pipeline(n_estimators=n_estimators)
-    print(f"Fitting RandomForest pipeline (n_estimators={n_estimators})...")
+    pipeline = build_pipeline(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        min_samples_leaf=min_samples_leaf,
+    )
+    print(
+        "Fitting RandomForest pipeline "
+        f"(n_estimators={n_estimators}, max_depth={max_depth}, "
+        f"min_samples_leaf={min_samples_leaf})..."
+    )
     pipeline.fit(X_train, y_train)
 
     y_pred = pipeline.predict(X_test)
@@ -131,6 +152,8 @@ def train_genre_classifier(
     metrics: dict[str, Any] = {
         "model_type": "Pipeline(StandardScaler, RandomForestClassifier)",
         "n_estimators": n_estimators,
+        "max_depth": max_depth,
+        "min_samples_leaf": min_samples_leaf,
         "test_size": test_size,
         "random_state": random_state,
         "cleaning": cleaning_report,
@@ -145,7 +168,11 @@ def train_genre_classifier(
         "classification_report": report,
     }
 
-    joblib.dump(pipeline, MODEL_PATH)
+    # compress=3 keeps the artifact GitHub-friendly (100MB file limit)
+    joblib.dump(pipeline, MODEL_PATH, compress=3)
+    model_size_mb = MODEL_PATH.stat().st_size / (1024 * 1024)
+    metrics["model_size_mb"] = round(model_size_mb, 2)
+
     METRICS_PATH.write_text(json.dumps(metrics, indent=2))
     FEATURE_LIST_PATH.write_text(json.dumps(AUDIO_FEATURES, indent=2))
 
@@ -164,9 +191,14 @@ def train_genre_classifier(
     for name, value in list(importances_sorted.items())[:8]:
         print(f"  {name}: {value:.4f}")
     print()
-    print(f"Saved model:   {MODEL_PATH}")
+    print(f"Saved model:   {MODEL_PATH} ({model_size_mb:.1f} MB)")
     print(f"Saved metrics: {METRICS_PATH}")
     print(f"Saved features:{FEATURE_LIST_PATH}")
+    if model_size_mb >= 95:
+        print(
+            "WARNING: model is near/over GitHub's 100MB limit. "
+            "Retrain with fewer trees or a smaller max_depth."
+        )
 
     return {
         "pipeline": pipeline,

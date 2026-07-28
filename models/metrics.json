@@ -1,0 +1,208 @@
+{
+  "model_type": "Pipeline(StandardScaler, RandomForestClassifier)",
+  "n_estimators": 100,
+  "max_depth": 18,
+  "min_samples_leaf": 5,
+  "test_size": 0.2,
+  "random_state": 42,
+  "cleaning": {
+    "raw_rows": 114000,
+    "raw_genres": 114,
+    "dropped_na_rows": 0,
+    "collapse_genres": true,
+    "genres_before_collapse": 114,
+    "genres_after_collapse": 18,
+    "rows_relabeled_by_collapse": 98000,
+    "dropped_exact_duplicate_rows": 10954,
+    "dropped_duplicate_track_rows": 13305,
+    "dedupe_strategy": "prefer_common_genre_per_track_id",
+    "min_genre_count": 500,
+    "dropped_rare_genres": [
+      "blues"
+    ],
+    "dropped_rare_genre_rows": 386,
+    "clean_rows": 89355,
+    "clean_genres": 17,
+    "common_genre_counts": {
+      "pop": 9854,
+      "rock": 8710,
+      "metal": 6600,
+      "hip-hop": 540,
+      "electronic": 19051,
+      "jazz": 598,
+      "classical": 3210,
+      "country": 2865,
+      "latin": 9456,
+      "r&b": 2104,
+      "folk": 1911,
+      "reggae": 1848,
+      "ambient": 6270,
+      "punk": 2164,
+      "world": 8020,
+      "kids": 5521
+    },
+    "common_genres_missing": [
+      "blues"
+    ],
+    "genre_counts": {
+      "electronic": 19051,
+      "pop": 9854,
+      "latin": 9456,
+      "rock": 8710,
+      "world": 8020,
+      "metal": 6600,
+      "ambient": 6270,
+      "kids": 5521,
+      "classical": 3210,
+      "country": 2865,
+      "punk": 2164,
+      "r&b": 2104,
+      "folk": 1911,
+      "reggae": 1848,
+      "gospel": 633,
+      "jazz": 598,
+      "hip-hop": 540
+    },
+    "cleaned_csv": "/users/PAS3421/adams3237/SU26-7030-Capstone-/data/processed/tracks_clean.csv"
+  },
+  "n_train": 71484,
+  "n_test": 17871,
+  "n_features": 13,
+  "n_classes": 17,
+  "accuracy": 0.4751832577919534,
+  "macro_f1": 0.4145917970695303,
+  "weighted_f1": 0.4761086663137748,
+  "feature_importances": {
+    "acousticness": 0.137497214172993,
+    "duration_ms": 0.10460394023026784,
+    "danceability": 0.1015277595015063,
+    "speechiness": 0.10066989556912587,
+    "valence": 0.09595046025745427,
+    "energy": 0.09400765668410402,
+    "loudness": 0.08429534298717692,
+    "instrumentalness": 0.0839242555670143,
+    "tempo": 0.0767556074150757,
+    "liveness": 0.06645999989576397,
+    "key": 0.036427966610119086,
+    "mode": 0.0120257137562709,
+    "time_signature": 0.005854187353127903
+  },
+  "classification_report": {
+    "ambient": {
+      "precision": 0.5395136778115501,
+      "recall": 0.5661881977671451,
+      "f1-score": 0.5525291828793775,
+      "support": 1254.0
+    },
+    "classical": {
+      "precision": 0.43968432919954903,
+      "recall": 0.6074766355140186,
+      "f1-score": 0.5101373446697187,
+      "support": 642.0
+    },
+    "country": {
+      "precision": 0.3484555984555985,
+      "recall": 0.6300174520069808,
+      "f1-score": 0.4487259167184587,
+      "support": 573.0
+    },
+    "electronic": {
+      "precision": 0.7182108626198083,
+      "recall": 0.5900262467191602,
+      "f1-score": 0.6478386167146974,
+      "support": 3810.0
+    },
+    "folk": {
+      "precision": 0.1935483870967742,
+      "recall": 0.3769633507853403,
+      "f1-score": 0.2557726465364121,
+      "support": 382.0
+    },
+    "gospel": {
+      "precision": 0.11671087533156499,
+      "recall": 0.3464566929133858,
+      "f1-score": 0.1746031746031746,
+      "support": 127.0
+    },
+    "hip-hop": {
+      "precision": 0.2,
+      "recall": 0.42592592592592593,
+      "f1-score": 0.27218934911242604,
+      "support": 108.0
+    },
+    "jazz": {
+      "precision": 0.7798165137614679,
+      "recall": 0.7142857142857143,
+      "f1-score": 0.7456140350877193,
+      "support": 119.0
+    },
+    "kids": {
+      "precision": 0.561025641025641,
+      "recall": 0.4954710144927536,
+      "f1-score": 0.5262145262145262,
+      "support": 1104.0
+    },
+    "latin": {
+      "precision": 0.5092636579572447,
+      "recall": 0.5668958223162348,
+      "f1-score": 0.5365365365365365,
+      "support": 1891.0
+    },
+    "metal": {
+      "precision": 0.5431959345002824,
+      "recall": 0.7287878787878788,
+      "f1-score": 0.6224522808152702,
+      "support": 1320.0
+    },
+    "pop": {
+      "precision": 0.4345665378244064,
+      "recall": 0.39928970065956365,
+      "f1-score": 0.4161819143310418,
+      "support": 1971.0
+    },
+    "punk": {
+      "precision": 0.17758620689655172,
+      "recall": 0.23787528868360278,
+      "f1-score": 0.2033563672260612,
+      "support": 433.0
+    },
+    "r&b": {
+      "precision": 0.3204819277108434,
+      "recall": 0.3159144893111639,
+      "f1-score": 0.3181818181818182,
+      "support": 421.0
+    },
+    "reggae": {
+      "precision": 0.1724137931034483,
+      "recall": 0.3783783783783784,
+      "f1-score": 0.23688663282571912,
+      "support": 370.0
+    },
+    "rock": {
+      "precision": 0.5076380728554641,
+      "recall": 0.24799081515499427,
+      "f1-score": 0.3332047821056691,
+      "support": 1742.0
+    },
+    "world": {
+      "precision": 0.3988919667590028,
+      "recall": 0.17955112219451372,
+      "f1-score": 0.24763542562338778,
+      "support": 1604.0
+    },
+    "accuracy": 0.4751832577919534,
+    "macro avg": {
+      "precision": 0.4094708225240704,
+      "recall": 0.4592643956409856,
+      "f1-score": 0.4145917970695303,
+      "support": 17871.0
+    },
+    "weighted avg": {
+      "precision": 0.5066146321231132,
+      "recall": 0.4751832577919534,
+      "f1-score": 0.4761086663137748,
+      "support": 17871.0
+    }
+  },
+  "model_size_mb": 71.49
+}
