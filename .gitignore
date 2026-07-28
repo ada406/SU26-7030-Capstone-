@@ -27,6 +27,8 @@ models/*
 outputs/*
 !outputs/.gitkeep
 !outputs/test_predictions.csv
+!outputs/confusion_matrix.png
+!outputs/confusion_matrix_normalized.png
 *.pkl
 
 # Local transfer archives (do not commit)
