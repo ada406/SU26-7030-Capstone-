@@ -11,18 +11,21 @@ venv/
 **/kaggle.json
 .env
 
-# Data (download locally; do not commit the CSV)
+# Data (download locally; do not commit large CSVs)
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
 
-# Model artifacts / figures (generated later)
+# Model artifacts / figures
+# Keep the trained genre model + metrics trackable for the repo once reviewed.
 models/*
 !models/.gitkeep
+!models/genre_classifier.joblib
+!models/metrics.json
+!models/feature_columns.json
 outputs/*
 !outputs/.gitkeep
-*.joblib
 *.pkl
 
 # Local transfer archives (do not commit)
