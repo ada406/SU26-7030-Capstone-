@@ -26,6 +26,7 @@ models/*
 !models/feature_columns.json
 outputs/*
 !outputs/.gitkeep
+!outputs/test_predictions.csv
 *.pkl
 
 # Local transfer archives (do not commit)
