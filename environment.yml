@@ -1,7 +1,6 @@
 name: spotify-genre-prediction
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - python=3.11
   - pip
@@ -14,5 +13,10 @@ dependencies:
   - ipykernel
   - joblib
   - streamlit
+  # Audio upload / feature extraction
+  - librosa
+  - soundfile
+  - audioread
+  - ffmpeg
   - pip:
       - kaggle

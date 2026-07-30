@@ -1,5 +1,6 @@
 # Conda / Python
 .conda/
+.conda-env/
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
@@ -33,3 +34,6 @@ outputs/*
 
 # Local transfer archives (do not commit)
 *.zip
+Miniforge3-*.sh
+Miniconda3-*.sh
+Anaconda3-*.sh

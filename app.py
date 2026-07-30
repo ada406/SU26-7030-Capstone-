@@ -17,12 +17,19 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data_io import AUDIO_FEATURES  # noqa: E402
+from src.audio_features import extract_features_from_upload, features_to_frame  # noqa: E402
+from src.data_io import AUDIO_FEATURES, RAW_CSV_PATH, TARGET_COLUMN  # noqa: E402
 from src.evaluate import PREDICTIONS_PATH, predict_genres, predict_topk_table  # noqa: E402
 from src.plots import CONFUSION_MATRIX_NORM_PATH, CONFUSION_MATRIX_PATH  # noqa: E402
+from src.song_lookup import (  # noqa: E402
+    catalog_available,
+    format_match_label,
+    load_song_catalog,
+    row_to_features,
+    search_songs,
+)
 from src.train import METRICS_PATH, MODEL_PATH, load_metrics, load_trained_model  # noqa: E402
 
-# Sensible defaults near mid-range pop/electronic values
 DEFAULT_FEATURES = {
     "danceability": 0.65,
     "energy": 0.70,
@@ -71,11 +78,10 @@ st.markdown(
       :root {
         --ink: #1c2421;
         --muted: #5b6762;
-        --paper: #f3f1ea;
-        --panel: #ffffff;
         --accent: #0f6b5c;
         --accent-soft: #d8efe9;
         --line: #d9ddd8;
+        --panel: #ffffff;
       }
 
       .stApp {
@@ -109,7 +115,7 @@ st.markdown(
         color: var(--muted);
         font-size: 1.05rem;
         margin-top: 0.45rem;
-        max-width: 46rem;
+        max-width: 48rem;
       }
 
       .result-card {
@@ -167,72 +173,96 @@ def get_sample_tracks(n: int = 40) -> pd.DataFrame | None:
     return df[cols].sample(n=min(n, len(df)), random_state=42).reset_index(drop=True)
 
 
+@st.cache_data(show_spinner="Loading song catalog…")
+def get_catalog() -> pd.DataFrame:
+    return load_song_catalog()
+
+
+def render_prediction(features_df: pd.DataFrame, model, source_note: str | None = None) -> None:
+    pred_row = predict_genres(features_df).iloc[0]
+    topk = predict_topk_table(features_df, k=5)
+    st.markdown('<div class="result-card">', unsafe_allow_html=True)
+    st.markdown(
+        f'<span class="genre-pill">{pred_row["predicted_genre"]}</span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<p class="metric-quiet" style="margin-top:0.85rem;">'
+        f'Confidence: <strong>{float(pred_row["confidence"]):.1%}</strong>'
+        f" · {len(model.classes_)} parent genres</p>",
+        unsafe_allow_html=True,
+    )
+    if source_note:
+        st.caption(source_note)
+    st.markdown("###### Top genre probabilities")
+    st.bar_chart(topk.set_index("genre"), horizontal=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def render_feature_controls(defaults: dict) -> dict:
     values = {}
-    st.sidebar.markdown("### Audio features")
-    st.sidebar.caption(
-        "The model predicts from Spotify-style audio features — not from a song title alone."
-    )
-
-    values["danceability"] = st.sidebar.slider(
-        "danceability", 0.0, 1.0, float(defaults["danceability"]), 0.01,
-        help=FEATURE_HELP["danceability"],
-    )
-    values["energy"] = st.sidebar.slider(
-        "energy", 0.0, 1.0, float(defaults["energy"]), 0.01,
-        help=FEATURE_HELP["energy"],
-    )
-    values["valence"] = st.sidebar.slider(
-        "valence", 0.0, 1.0, float(defaults["valence"]), 0.01,
-        help=FEATURE_HELP["valence"],
-    )
-    values["tempo"] = st.sidebar.slider(
-        "tempo (BPM)", 40.0, 220.0, float(defaults["tempo"]), 0.5,
-        help=FEATURE_HELP["tempo"],
-    )
-    values["loudness"] = st.sidebar.slider(
-        "loudness (dB)", -40.0, 0.0, float(defaults["loudness"]), 0.1,
-        help=FEATURE_HELP["loudness"],
-    )
-    values["acousticness"] = st.sidebar.slider(
-        "acousticness", 0.0, 1.0, float(defaults["acousticness"]), 0.01,
-        help=FEATURE_HELP["acousticness"],
-    )
-    values["instrumentalness"] = st.sidebar.slider(
-        "instrumentalness", 0.0, 1.0, float(defaults["instrumentalness"]), 0.01,
-        help=FEATURE_HELP["instrumentalness"],
-    )
-    values["speechiness"] = st.sidebar.slider(
-        "speechiness", 0.0, 1.0, float(defaults["speechiness"]), 0.01,
-        help=FEATURE_HELP["speechiness"],
-    )
-    values["liveness"] = st.sidebar.slider(
-        "liveness", 0.0, 1.0, float(defaults["liveness"]), 0.01,
-        help=FEATURE_HELP["liveness"],
-    )
-    values["duration_ms"] = st.sidebar.slider(
-        "duration (ms)", 30_000, 600_000, int(defaults["duration_ms"]), 1000,
-        help=FEATURE_HELP["duration_ms"],
-    )
-    values["key"] = st.sidebar.slider(
-        "key", 0, 11, int(defaults["key"]), 1,
-        help=FEATURE_HELP["key"],
-    )
-    values["mode"] = st.sidebar.selectbox(
-        "mode",
-        options=[0, 1],
-        index=int(defaults["mode"]),
-        format_func=lambda x: "minor (0)" if x == 0 else "major (1)",
-        help=FEATURE_HELP["mode"],
-    )
-    values["time_signature"] = st.sidebar.selectbox(
-        "time_signature",
-        options=[3, 4, 5, 6, 7],
-        index=[3, 4, 5, 6, 7].index(int(defaults["time_signature"]))
-        if int(defaults["time_signature"]) in [3, 4, 5, 6, 7]
-        else 1,
-        help=FEATURE_HELP["time_signature"],
-    )
+    st.markdown("### Audio features")
+    c1, c2 = st.columns(2)
+    with c1:
+        values["danceability"] = st.slider(
+            "danceability", 0.0, 1.0, float(defaults["danceability"]), 0.01,
+            help=FEATURE_HELP["danceability"],
+        )
+        values["energy"] = st.slider(
+            "energy", 0.0, 1.0, float(defaults["energy"]), 0.01,
+            help=FEATURE_HELP["energy"],
+        )
+        values["valence"] = st.slider(
+            "valence", 0.0, 1.0, float(defaults["valence"]), 0.01,
+            help=FEATURE_HELP["valence"],
+        )
+        values["tempo"] = st.slider(
+            "tempo (BPM)", 40.0, 220.0, float(defaults["tempo"]), 0.5,
+            help=FEATURE_HELP["tempo"],
+        )
+        values["loudness"] = st.slider(
+            "loudness (dB)", -40.0, 0.0, float(defaults["loudness"]), 0.1,
+            help=FEATURE_HELP["loudness"],
+        )
+        values["acousticness"] = st.slider(
+            "acousticness", 0.0, 1.0, float(defaults["acousticness"]), 0.01,
+            help=FEATURE_HELP["acousticness"],
+        )
+        values["duration_ms"] = st.slider(
+            "duration (ms)", 30_000, 600_000, int(defaults["duration_ms"]), 1000,
+            help=FEATURE_HELP["duration_ms"],
+        )
+    with c2:
+        values["instrumentalness"] = st.slider(
+            "instrumentalness", 0.0, 1.0, float(defaults["instrumentalness"]), 0.01,
+            help=FEATURE_HELP["instrumentalness"],
+        )
+        values["speechiness"] = st.slider(
+            "speechiness", 0.0, 1.0, float(defaults["speechiness"]), 0.01,
+            help=FEATURE_HELP["speechiness"],
+        )
+        values["liveness"] = st.slider(
+            "liveness", 0.0, 1.0, float(defaults["liveness"]), 0.01,
+            help=FEATURE_HELP["liveness"],
+        )
+        values["key"] = st.slider(
+            "key", 0, 11, int(defaults["key"]), 1, help=FEATURE_HELP["key"]
+        )
+        values["mode"] = st.selectbox(
+            "mode",
+            options=[0, 1],
+            index=int(defaults["mode"]),
+            format_func=lambda x: "minor (0)" if x == 0 else "major (1)",
+            help=FEATURE_HELP["mode"],
+        )
+        ts_opts = [3, 4, 5, 6, 7]
+        ts_default = int(defaults["time_signature"])
+        values["time_signature"] = st.selectbox(
+            "time_signature",
+            options=ts_opts,
+            index=ts_opts.index(ts_default) if ts_default in ts_opts else 1,
+            help=FEATURE_HELP["time_signature"],
+        )
     return values
 
 
@@ -243,7 +273,7 @@ def main() -> None:
           <p class="brand-title">Genre Signal</p>
           <p class="brand-sub">
             Predict a track’s parent genre from Spotify audio features.
-            Adjust the feature controls, or load a sample from the held-out test set.
+            Look up a dataset song, upload an MP3/WAV, or set features manually.
           </p>
         </div>
         """,
@@ -253,86 +283,182 @@ def main() -> None:
     if not MODEL_PATH.is_file():
         st.error(
             f"Missing trained model at `{MODEL_PATH}`.\n\n"
-            "Train first with `python scripts/train_model.py`, or pull the model from GitHub."
+            "Pull from GitHub or train with `python scripts/train_model.py`."
         )
         st.stop()
 
     model = get_model()
     metrics = get_metrics()
-    samples = get_sample_tracks()
 
-    if "feature_defaults" not in st.session_state:
-        st.session_state.feature_defaults = DEFAULT_FEATURES.copy()
+    tab_lookup, tab_upload, tab_manual, tab_model = st.tabs(
+        ["Song lookup", "Upload audio", "Manual features", "Model performance"]
+    )
 
-    with st.sidebar:
-        st.markdown("### Load a sample track")
+    with tab_lookup:
+        st.subheader("Look up a song")
+        st.markdown(
+            "Search by **song title** and/or **artist**. Matches come from the "
+            "Kaggle Spotify Tracks dataset used to train this project "
+            "(Spotify’s live audio-features API is no longer available for new apps)."
+        )
+
+        if not catalog_available():
+            st.warning(
+                f"Song lookup needs `{RAW_CSV_PATH}`.\n\n"
+                "Download the dataset (README Step 2), place `dataset.csv` in "
+                "`data/raw/`, then click **Rerun** / refresh this page.\n\n"
+                "You can still use the **Manual features** tab without the dataset."
+            )
+        else:
+            try:
+                catalog = get_catalog()
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"Could not load song catalog: {exc}")
+                catalog = None
+
+            if catalog is not None:
+                st.caption(f"Catalog loaded · {len(catalog):,} searchable tracks")
+                with st.form("song_search_form"):
+                    query = st.text_input(
+                        "Song title or artist",
+                        placeholder="e.g. bohemian rhapsody, billie eilish, lo-fi",
+                    )
+                    submitted = st.form_submit_button("Search", type="primary")
+
+                if submitted:
+                    st.session_state["last_query"] = query
+
+                q = st.session_state.get("last_query", "")
+                if q and len(str(q).strip()) >= 2:
+                    hits = search_songs(str(q), catalog=catalog, limit=20)
+                    if hits.empty:
+                        st.info("No matches. Try fewer words or a different spelling.")
+                    else:
+                        labels = [format_match_label(hits.iloc[i]) for i in range(len(hits))]
+                        choice = st.selectbox("Matches", options=labels)
+                        idx = labels.index(choice)
+                        row = hits.iloc[idx]
+                        features = row_to_features(row)
+                        features_df = pd.DataFrame([features])[AUDIO_FEATURES]
+
+                        meta_cols = [
+                            c
+                            for c in ("track_name", "artists", "album_name", TARGET_COLUMN)
+                            if c in row.index
+                        ]
+                        st.markdown("###### Selected track")
+                        st.write({c: row[c] for c in meta_cols})
+
+                        left, right = st.columns(2)
+                        with left:
+                            st.markdown("###### Audio features used")
+                            st.dataframe(
+                                features_df.T.rename(columns={0: "value"}),
+                                use_container_width=True,
+                            )
+                        with right:
+                            st.markdown("###### Predicted parent genre")
+                            dataset_genre = (
+                                str(row[TARGET_COLUMN])
+                                if TARGET_COLUMN in row.index and pd.notna(row[TARGET_COLUMN])
+                                else None
+                            )
+                            note = (
+                                f"Dataset label for this row: `{dataset_genre}` "
+                                "(may be fine-grained; the model predicts a collapsed parent genre)."
+                                if dataset_genre
+                                else None
+                            )
+                            render_prediction(features_df, model, source_note=note)
+                elif submitted:
+                    st.info("Enter at least 2 characters to search.")
+
+    with tab_upload:
+        st.subheader("Upload an audio file")
+        st.markdown(
+            "Upload an **MP3, WAV, FLAC, or OGG** file from outside the dataset. "
+            "The app estimates Spotify-like audio features with **librosa**, then "
+            "runs the trained model.\n\n"
+            "**Note:** These estimates are approximate (not Spotify’s proprietary "
+            "features), so predictions may be less accurate than dataset lookup."
+        )
+        uploaded = st.file_uploader(
+            "Choose an audio file",
+            type=["mp3", "wav", "flac", "ogg", "m4a"],
+        )
+        analyze = st.button(
+            "Extract features & predict",
+            type="primary",
+            disabled=uploaded is None,
+        )
+        if uploaded is not None and analyze:
+            with st.spinner("Analyzing audio (first ~90 seconds)…"):
+                try:
+                    feats = extract_features_from_upload(
+                        uploaded.getvalue(),
+                        filename=uploaded.name,
+                    )
+                    features_df = features_to_frame(feats)
+                    st.session_state["upload_features"] = features_df
+                    st.session_state["upload_name"] = uploaded.name
+                except Exception as exc:  # noqa: BLE001
+                    st.error(
+                        f"Could not read/analyze this file: {exc}\n\n"
+                        "Tip: WAV usually works without extra setup. "
+                        "MP3 often requires **ffmpeg** installed on your system."
+                    )
+                    st.session_state.pop("upload_features", None)
+
+        if "upload_features" in st.session_state:
+            features_df = st.session_state["upload_features"]
+            st.caption(f"File: `{st.session_state.get('upload_name', 'upload')}`")
+            left, right = st.columns(2)
+            with left:
+                st.markdown("###### Estimated features")
+                st.dataframe(
+                    features_df.T.rename(columns={0: "value"}),
+                    use_container_width=True,
+                )
+            with right:
+                st.markdown("###### Predicted parent genre")
+                render_prediction(
+                    features_df,
+                    model,
+                    source_note=(
+                        "Features were estimated from the audio file (approximate). "
+                        "For exact Spotify features, use Song lookup on dataset tracks."
+                    ),
+                )
+
+    with tab_manual:
+        st.subheader("Predict from manual audio features")
+        samples = get_sample_tracks()
+        defaults = st.session_state.get("feature_defaults", DEFAULT_FEATURES.copy())
+
         if samples is not None and len(samples):
-            options = ["(manual features)"] + [f"row {i}" for i in range(len(samples))]
-            pick = st.selectbox("Test-set example", options=options, key="sample_pick")
-            if pick != st.session_state.get("_applied_sample_pick"):
-                st.session_state._applied_sample_pick = pick
-                if pick == "(manual features)":
-                    st.session_state.feature_defaults = DEFAULT_FEATURES.copy()
-                else:
+            with st.expander("Load a held-out test example"):
+                options = ["(manual)"] + [f"row {i}" for i in range(len(samples))]
+                pick = st.selectbox("Example", options=options, key="manual_sample_pick")
+                if pick != "(manual)":
                     idx = int(pick.split()[-1])
                     row = samples.iloc[idx]
-                    st.session_state.feature_defaults = {f: row[f] for f in AUDIO_FEATURES}
-                    st.info(
-                        f"Loaded sample · true genre: **{row.get('true_genre', '?')}**"
-                        f" · model had predicted: **{row.get('predicted_genre', '?')}**"
+                    defaults = {f: row[f] for f in AUDIO_FEATURES}
+                    st.caption(
+                        f"True genre: {row.get('true_genre', '?')} · "
+                        f"Saved model prediction: {row.get('predicted_genre', '?')}"
                     )
-                    st.rerun()
-            if st.button("Reset to defaults", use_container_width=True):
-                st.session_state.feature_defaults = DEFAULT_FEATURES.copy()
-                st.session_state._applied_sample_pick = "(manual features)"
-                st.session_state.sample_pick = "(manual features)"
-                st.rerun()
-        else:
-            st.caption("No `outputs/test_predictions.csv` found for samples.")
 
-    feature_values = render_feature_controls(st.session_state.feature_defaults)
-    features_df = pd.DataFrame([feature_values])[AUDIO_FEATURES]
-
-    tab_predict, tab_model = st.tabs(["Predict", "Model performance"])
-
-    with tab_predict:
-        left, right = st.columns([1.05, 1.0], gap="large")
-
+        feature_values = render_feature_controls(defaults)
+        features_df = pd.DataFrame([feature_values])[AUDIO_FEATURES]
+        left, right = st.columns(2)
         with left:
-            st.subheader("Current features")
             st.dataframe(features_df.T.rename(columns={0: "value"}), use_container_width=True)
             run = st.button("Predict genre", type="primary", use_container_width=True)
-
         with right:
-            st.subheader("Prediction")
-            if run or "last_prediction" in st.session_state:
-                if run:
-                    pred_row = predict_genres(features_df).iloc[0]
-                    topk = predict_topk_table(features_df, k=5)
-                    st.session_state.last_prediction = {
-                        "genre": str(pred_row["predicted_genre"]),
-                        "confidence": float(pred_row["confidence"]),
-                        "topk": topk,
-                    }
-
-                result = st.session_state.last_prediction
-                st.markdown('<div class="result-card">', unsafe_allow_html=True)
-                st.markdown(
-                    f'<span class="genre-pill">{result["genre"]}</span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<p class="metric-quiet" style="margin-top:0.85rem;">'
-                    f'Confidence: <strong>{result["confidence"]:.1%}</strong>'
-                    f" · {len(model.classes_)} parent genres</p>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown("###### Top genre probabilities")
-                chart_df = result["topk"].set_index("genre")
-                st.bar_chart(chart_df, horizontal=True)
-                st.markdown("</div>", unsafe_allow_html=True)
+            if run:
+                render_prediction(features_df, model)
             else:
-                st.info("Set features in the sidebar, then click **Predict genre**.")
+                st.info("Adjust features, then click **Predict genre**.")
 
     with tab_model:
         st.subheader("Held-out test performance")
@@ -343,8 +469,8 @@ def main() -> None:
             c3.metric("Weighted F1", f"{metrics.get('weighted_f1', 0):.3f}")
             c4.metric("Genres", f"{metrics.get('n_classes', len(model.classes_))}")
             st.caption(
-                "Metrics are from the stratified 20% test split after cleaning "
-                "and collapsing fine-grained genres into parent labels."
+                "Metrics use a stratified 20% test split after cleaning and "
+                "collapsing fine-grained genres into parent labels."
             )
         else:
             st.warning("No `models/metrics.json` found.")
@@ -358,10 +484,7 @@ def main() -> None:
                 st.caption("Missing outputs/confusion_matrix.png")
         with img_cols[1]:
             if CONFUSION_MATRIX_NORM_PATH.is_file():
-                st.image(
-                    str(CONFUSION_MATRIX_NORM_PATH),
-                    caption="Row-normalized",
-                )
+                st.image(str(CONFUSION_MATRIX_NORM_PATH), caption="Row-normalized")
             else:
                 st.caption("Missing outputs/confusion_matrix_normalized.png")
 
