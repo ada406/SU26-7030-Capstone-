@@ -185,7 +185,7 @@ For the simplest demo, run `streamlit run app.py` on a local machine after cloni
 | `Port 8501 is not available` | `streamlit run app.py --server.port 8502` |
 | Song lookup warns missing CSV | Put `dataset.csv` in `data/raw/` and refresh the app |
 | Upload audio fails on MP3 | Install ffmpeg, or convert/upload a WAV instead |
-| `No module named 'librosa'` | `conda install librosa soundfile audioread` (or recreate env from `environment.yml`) |
+| `No module named 'librosa'` | `conda install -c conda-forge librosa pysoundfile audioread` (or recreate env from `environment.yml`) |
 | `No module named 'streamlit'` | `conda install streamlit` or `pip install streamlit` inside the env |
 | `ERR_CONNECTION_REFUSED` in browser | Streamlit isn’t running — start it and keep that terminal open |
 | Want to recreate env cleanly | `conda env remove -n spotify-genre-prediction` then `conda env create -f environment.yml` |
