@@ -15,7 +15,7 @@ dependencies:
   - streamlit
   # Audio upload / feature extraction
   - librosa
-  - soundfile
+  - pysoundfile
   - audioread
   - ffmpeg
   - pip:
