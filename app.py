@@ -20,6 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.audio_features import extract_features_from_upload, features_to_frame  # noqa: E402
 from src.data_io import AUDIO_FEATURES, RAW_CSV_PATH, TARGET_COLUMN  # noqa: E402
 from src.evaluate import PREDICTIONS_PATH, predict_genres, predict_topk_table  # noqa: E402
+from src.genre_map import parent_genre_guide_frame  # noqa: E402
 from src.plots import CONFUSION_MATRIX_NORM_PATH, CONFUSION_MATRIX_PATH  # noqa: E402
 from src.song_lookup import (  # noqa: E402
     catalog_available,
@@ -77,22 +78,43 @@ st.markdown(
 
       :root {
         --ink: #1c2421;
-        --muted: #5b6762;
+        --muted: #3f4a45;
         --accent: #0f6b5c;
         --accent-soft: #d8efe9;
         --line: #d9ddd8;
         --panel: #ffffff;
       }
 
+      /* Force readable dark text even if Streamlit/OS is in dark mode */
+      .stApp, .stApp * {
+        color-scheme: light;
+      }
+
       .stApp {
         background:
           radial-gradient(1200px 500px at 10% -10%, #e7f3ef 0%, transparent 55%),
           linear-gradient(180deg, #f7f5ef 0%, #efece4 100%);
-        color: var(--ink);
+        color: var(--ink) !important;
         font-family: "Source Sans 3", "Segoe UI", sans-serif;
       }
 
-      h1, h2, h3, .brand-title {
+      .stApp p, .stApp span, .stApp label, .stApp li,
+      .stApp .stMarkdown, .stApp .stCaption, .stApp .stText,
+      .stApp [data-testid="stWidgetLabel"],
+      .stApp [data-testid="stMarkdownContainer"],
+      .stApp [data-testid="stCaptionContainer"],
+      .stApp [data-testid="stMetricLabel"],
+      .stApp [data-testid="stMetricValue"],
+      .stApp [data-testid="stMetricDelta"],
+      .stApp [data-baseweb="tab"],
+      .stApp [data-baseweb="select"] > div,
+      .stApp .stSelectbox, .stApp .stSlider, .stApp .stTextInput,
+      .stApp .stFileUploader, .stApp .stAlert {
+        color: var(--ink) !important;
+      }
+
+      .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+      .brand-title {
         font-family: Fraunces, Georgia, serif !important;
         letter-spacing: -0.02em;
         color: var(--ink) !important;
@@ -112,7 +134,7 @@ st.markdown(
       }
 
       .brand-sub {
-        color: var(--muted);
+        color: var(--muted) !important;
         font-size: 1.05rem;
         margin-top: 0.45rem;
         max-width: 48rem;
@@ -129,7 +151,7 @@ st.markdown(
       .genre-pill {
         display: inline-block;
         background: var(--accent-soft);
-        color: var(--accent);
+        color: var(--accent) !important;
         border-radius: 999px;
         padding: 0.35rem 0.9rem;
         font-weight: 700;
@@ -138,13 +160,27 @@ st.markdown(
       }
 
       .metric-quiet {
-        color: var(--muted);
+        color: var(--muted) !important;
         font-size: 0.95rem;
+      }
+
+      .metric-quiet strong {
+        color: var(--ink) !important;
       }
 
       div[data-testid="stSidebar"] {
         background: #fbfaf6;
         border-right: 1px solid var(--line);
+      }
+
+      div[data-testid="stSidebar"] * {
+        color: var(--ink) !important;
+      }
+
+      /* Keep primary buttons readable */
+      .stApp .stButton > button[kind="primary"],
+      .stApp button[data-testid="baseButton-primary"] {
+        color: #ffffff !important;
       }
     </style>
     """,
@@ -289,6 +325,18 @@ def main() -> None:
 
     model = get_model()
     metrics = get_metrics()
+
+    with st.sidebar:
+        st.markdown("### Parent genres")
+        st.caption(
+            "The model predicts one of these 9 collapsed labels "
+            "(not the fine-grained Kaggle tags)."
+        )
+        st.dataframe(
+            parent_genre_guide_frame(),
+            use_container_width=True,
+            hide_index=True,
+        )
 
     tab_lookup, tab_upload, tab_manual, tab_model = st.tabs(
         ["Song lookup", "Upload audio", "Manual features", "Model performance"]
@@ -488,8 +536,16 @@ def main() -> None:
             else:
                 st.caption("Missing outputs/confusion_matrix_normalized.png")
 
-        with st.expander("Model classes"):
-            st.write(", ".join(str(c) for c in model.classes_))
+        with st.expander("What each predicted genre means", expanded=True):
+            st.caption(
+                "Dataset song lookup may still show a fine-grained Kaggle tag; "
+                "the model always predicts one of these parent genres."
+            )
+            st.dataframe(
+                parent_genre_guide_frame(),
+                use_container_width=True,
+                hide_index=True,
+            )
 
 
 if __name__ == "__main__":

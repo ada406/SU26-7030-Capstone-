@@ -2,12 +2,47 @@
 
 from __future__ import annotations
 
-# Fine-grained Kaggle labels -> collapsed parent genre.
-# Unmapped labels keep their original name (then rare-genre filtering may drop them).
+# Mood / activity / entertainment / vague tags that are not reliable music genres.
+# These rows are dropped during cleaning instead of being forced into a parent.
+AMBIGUOUS_FINE_GENRES: frozenset[str] = frozenset(
+    {
+        # Mood / activity playlists
+        "happy",
+        "sad",
+        "sleep",
+        "study",
+        "party",
+        "chill",
+        "romance",
+        "new-age",
+        # Entertainment / kids / soundtrack-ish grab-bags
+        "comedy",
+        "disney",
+        "show-tunes",
+        "children",
+        "kids",
+        "anime",
+        "pop-film",
+        # Vague style/region catch-alls
+        "guitar",
+        "british",
+        "indie",
+        "alternative",
+        "groove",
+        # Language tags (not musical genres)
+        "french",
+        "german",
+        "swedish",
+        "malay",
+        "spanish",
+    }
+)
+
+# Fine-grained Kaggle labels -> collapsed parent genre (~9 parents).
+# Only relatively coherent genre tags are mapped; ambiguous tags are listed above.
 GENRE_COLLAPSE_MAP: dict[str, str] = {
     # Pop
     "pop": "pop",
-    "pop-film": "pop",
     "power-pop": "pop",
     "synth-pop": "pop",
     "indie-pop": "pop",
@@ -16,34 +51,28 @@ GENRE_COLLAPSE_MAP: dict[str, str] = {
     "cantopop": "pop",
     "mandopop": "pop",
     "j-idol": "pop",
-    # Rock
+    # Rock (includes punk — often confused with rock in audio-feature space)
     "rock": "rock",
     "alt-rock": "rock",
-    "alternative": "rock",
     "psych-rock": "rock",
     "rock-n-roll": "rock",
     "rockabilly": "rock",
     "hard-rock": "rock",
     "grunge": "rock",
     "j-rock": "rock",
-    "guitar": "rock",
-    "british": "rock",
-    "indie": "rock",
-    # Metal
+    "punk": "rock",
+    "punk-rock": "rock",
+    "hardcore": "rock",
+    "emo": "rock",
+    # Metal (kept separate — acoustically distinctive)
     "metal": "metal",
     "heavy-metal": "metal",
     "black-metal": "metal",
     "death-metal": "metal",
     "metalcore": "metal",
     "grindcore": "metal",
-    "industrial": "metal",
     "goth": "metal",
-    # Punk / hardcore
-    "punk": "punk",
-    "punk-rock": "punk",
-    "hardcore": "punk",
-    "emo": "punk",
-    # Electronic / dance
+    # Electronic (true electronic/dance + ambient)
     "edm": "electronic",
     "electro": "electronic",
     "electronic": "electronic",
@@ -66,30 +95,14 @@ GENRE_COLLAPSE_MAP: dict[str, str] = {
     "garage": "electronic",
     "j-dance": "electronic",
     "trip-hop": "electronic",
-    # Hip-hop / rap
-    "hip-hop": "hip-hop",
-    # R&B / soul / funk
-    "r-n-b": "r&b",
-    "soul": "r&b",
-    "funk": "r&b",
-    "groove": "r&b",
-    # Jazz
-    "jazz": "jazz",
-    # Classical / opera / piano
-    "classical": "classical",
-    "opera": "classical",
-    "piano": "classical",
-    "romance": "classical",
-    # Country
-    "country": "country",
-    "honky-tonk": "country",
-    "bluegrass": "country",
-    # Folk / singer-songwriter / acoustic
-    "folk": "folk",
-    "singer-songwriter": "folk",
-    "songwriter": "folk",
-    "acoustic": "folk",
-    # Latin / Brazilian
+    "industrial": "electronic",
+    "ambient": "electronic",
+    # Urban (hip-hop + R&B / soul / funk)
+    "hip-hop": "urban",
+    "r-n-b": "urban",
+    "soul": "urban",
+    "funk": "urban",
+    # Latin (includes reggae family)
     "latin": "latin",
     "latino": "latin",
     "salsa": "latin",
@@ -101,41 +114,76 @@ GENRE_COLLAPSE_MAP: dict[str, str] = {
     "forro": "latin",
     "tango": "latin",
     "reggaeton": "latin",
-    "spanish": "latin",
-    # Reggae family
-    "reggae": "reggae",
-    "dancehall": "reggae",
-    "dub": "reggae",
-    "ska": "reggae",
-    # Blues
-    "blues": "blues",
-    # Ambient / chill / sleep / study
-    "ambient": "ambient",
-    "chill": "ambient",
-    "sleep": "ambient",
-    "study": "ambient",
-    "new-age": "ambient",
-    "happy": "ambient",
-    "sad": "ambient",
-    # World / regional
+    "reggae": "latin",
+    "dancehall": "latin",
+    "dub": "latin",
+    "ska": "latin",
+    # Roots (folk / country / blues / gospel)
+    "folk": "roots",
+    "singer-songwriter": "roots",
+    "songwriter": "roots",
+    "acoustic": "roots",
+    "country": "roots",
+    "honky-tonk": "roots",
+    "bluegrass": "roots",
+    "blues": "roots",
+    "gospel": "roots",
+    # Classical / jazz / opera / piano
+    "classical": "classical",
+    "opera": "classical",
+    "piano": "classical",
+    "jazz": "classical",
+    # World / regional music (language-only and kids tags excluded)
     "afrobeat": "world",
     "indian": "world",
     "iranian": "world",
     "turkish": "world",
-    "malay": "world",
-    "french": "world",
-    "german": "world",
-    "swedish": "world",
     "world-music": "world",
-    # Kids / family entertainment
-    "children": "kids",
-    "kids": "kids",
-    "disney": "kids",
-    "show-tunes": "kids",
-    "comedy": "kids",
-    "anime": "kids",
-    "party": "pop",
 }
+
+# Canonical parent list after the coarse collapse (for reports / docs).
+PARENT_GENRES = [
+    "classical",
+    "electronic",
+    "latin",
+    "metal",
+    "pop",
+    "rock",
+    "roots",
+    "urban",
+    "world",
+]
+
+# Short examples shown in the README / Streamlit app.
+PARENT_GENRE_EXAMPLES: dict[str, str] = {
+    "classical": "classical, jazz, opera, piano",
+    "electronic": "edm, house, techno, ambient, disco, …",
+    "latin": "latin, salsa, reggae, reggaeton, samba, …",
+    "metal": "metal, death-metal, metalcore, goth, …",
+    "pop": "pop, synth-pop, k-pop, indie-pop, …",
+    "rock": "rock, alt-rock, punk, grunge, emo, …",
+    "roots": "folk, country, blues, gospel, bluegrass, …",
+    "urban": "hip-hop, R&B, soul, funk",
+    "world": "afrobeat, indian, turkish, iranian, world-music",
+}
+
+
+def parent_genre_guide_frame():
+    """Return a small DataFrame describing each parent prediction label."""
+    import pandas as pd
+
+    return pd.DataFrame(
+        [
+            {"Prediction": name, "Includes (examples)": PARENT_GENRE_EXAMPLES[name]}
+            for name in PARENT_GENRES
+            if name in PARENT_GENRE_EXAMPLES
+        ]
+    )
+
+
+def is_ambiguous_fine_genre(label: str) -> bool:
+    """True when a fine-grained label is too noisy to keep for training."""
+    return str(label).strip().lower() in AMBIGUOUS_FINE_GENRES
 
 
 def collapse_genre(label: str) -> str:
